@@ -180,7 +180,10 @@ def standardizeDatasetToEdf(rootDir: str, outDir: str, electrodes: tuple[str] = 
     edfFiles = glob.iglob(os.path.join(rootDir, '**/*.edf'), recursive=True)
     for edfFile in edfFiles:
         outFile = os.path.join(outDir, edfFile[len(rootDir):])  # swap rootDir for outDir
-        standadizeToEdf(edfFile, outFile, electrodes, fs, ref)
+        try:
+            standadizeToEdf(edfFile, outFile, electrodes, fs, ref)
+        except ValueError as exception:
+            print('{}: {}'.format(exception, edfFile))
 
 
 if __name__ == '__main__':
