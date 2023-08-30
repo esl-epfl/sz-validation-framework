@@ -25,8 +25,7 @@ def dfToEvents(df: pd.DataFrame) -> list[tuple[float, float]]:
             events.append((row.startTime, row.endTime))
     return events
 
-
-def evaluate2AnnotationFiles(refFilename: str, hypFilename: str, fs: int) -> pd.DataFrame:
+def evaluate2AnnotationFiles(refFilename: str, hypFilename: str, labelFreq,  params) -> pd.DataFrame:
     ''' Compares two annotation files in the same format. One are reference true annotations and other
     one are predicted hypothesis by the ML algorithm. Goes one by one file in the annotations file and performs matching of
     the true and predicted labels and calculated various performances for individual file in annotations files.
@@ -34,8 +33,8 @@ def evaluate2AnnotationFiles(refFilename: str, hypFilename: str, fs: int) -> pd.
     Args:
         refFilename: Filename of the file containing true annotations.
         hypFilename: Filename of the file containing predicted annotations.
-        fs: Sampling resolution of labels.
-
+        labelFreq: Sampling resolution of labels.
+        params: Class with various parameters for scoring on the event basis.
     Returns: Dataframe containing various performances per each file.
     '''
     results = {
@@ -69,14 +68,14 @@ def evaluate2AnnotationFiles(refFilename: str, hypFilename: str, fs: int) -> pd.
 
     for filepath, _ in refDf.groupby(['filepath']):
         # fs = 256
-        nSamples = round(refDf[refDf.filepath == filepath].duration.iloc[0] * fs)
+        nSamples = round(refDf[refDf.filepath == filepath].duration.iloc[0] * labelFreq)
 
         # Convert annotations
-        ref = Annotation(dfToEvents(refDf[refDf.filepath == filepath]), fs, nSamples)
-        hyp = Annotation(dfToEvents(hypDf[hypDf.filepath == filepath]), fs, nSamples)
+        ref = Annotation(dfToEvents(refDf[refDf.filepath == filepath]), labelFreq, nSamples)
+        hyp = Annotation(dfToEvents(hypDf[hypDf.filepath == filepath]), labelFreq, nSamples)
 
         # Compute performance
-        scoresEvent = scoring.EventScoring(ref, hyp)
+        scoresEvent = scoring.EventScoring(ref, hyp, params)
         scoresSample = scoring.SampleScoring(ref, hyp)
 
         # Collect results
@@ -102,7 +101,8 @@ def evaluate2AnnotationFiles(refFilename: str, hypFilename: str, fs: int) -> pd.
 
     return pd.DataFrame(results)
 
-def  recalculatePerfPerSubject(performancePerFile, subjects, labelFreq):
+# def  recalculatePerfPerSubject(performancePerFile, subjects, labelFreq):
+def recalculatePerfPerSubject(performancePerFile, subjects, labelFreq, params):
     ''' Uses output from evaluate2AnnotationFiles which contains performance per each file of the dataset,
     and calculated performance per subject.
 
@@ -110,6 +110,7 @@ def  recalculatePerfPerSubject(performancePerFile, subjects, labelFreq):
         performancePerFile: Dataframe with performance per each file. It is output of evaluate2AnnotationFiles function.
         subjects: Subjects for which to calculate performance.
         labelFreq: Sampling resolution of labels.
+        params: Class with various parameters for scoring on the event basis.
 
     Returns: Dataframe containing various performances per each subject.
     '''
@@ -141,7 +142,7 @@ def  recalculatePerfPerSubject(performancePerFile, subjects, labelFreq):
         nSamples = int(np.sum(dataThisSubj.duration.to_numpy()))
         events = [(1, 3), (6, 9)]  # just sth random
         ref = Annotation(events, labelFreq, nSamples)
-        scoresEvent = scoring.EventScoring(ref, ref)
+        scoresEvent = scoring.EventScoring(ref, ref, params)
         scoresEvent.refTrue = np.sum(dataThisSubj.Event_numEvents.to_numpy())
         scoresEvent.tp = np.sum(dataThisSubj.Event_numTP.to_numpy())
         scoresEvent.fp = np.sum(dataThisSubj.Event_numFP.to_numpy())
