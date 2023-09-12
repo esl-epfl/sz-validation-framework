@@ -6,6 +6,8 @@ https://eslweb.epfl.ch/epilepsybenchmarks/framework-for-validation-of-epileptic-
 The script can be used as a library or as a command line application.
 """
 import argparse
+import enum
+import logging
 import os
 import glob
 import re
@@ -15,14 +17,44 @@ import pandas as pd
 import pyedflib
 import resampy
 
-ELECTRODES = ('Fp1', 'F3', 'C3', 'P3', 'O1', 'F7', 'T3', 'T5', 'Fz', 'Cz', 'Pz',
-              'Fp2', 'F4', 'C4', 'P4', 'O2', 'F8', 'T4', 'T6')
 BIPOLAR_DBANANA = ('Fp1-F3', 'F3-C3', 'C3-P3', 'P3-O1', 'Fp1-F7', 'F7-T3', 'T3-T5', 'T5-O1', 'Fz-Cz', 'Cz-Pz',
                    'Fp2-F4', 'F4-C4', 'C4-P4', 'P4-O2', 'Fp2-F8', 'F8-T4', 'T4-T6', 'T6-O2')
+ELECTRODES = ('Fp1', 'F3', 'C3', 'P3', 'O1', 'F7', 'T3', 'T5', 'Fz', 'Cz', 'Pz',
+              'Fp2', 'F4', 'C4', 'P4', 'O2', 'F8', 'T4', 'T6')
 FS = 256
 
 
-def _getChannelIndices(channels: list[str], electrodes: tuple[str] = ELECTRODES) -> list[int]:
+class Format(enum.Enum):
+    CSV = 'csv'
+    CSV_GZIP = 'csv.gzip'
+    EDF = 'edf'
+    PARQUET_GZIP = 'parquet.gzip'
+
+
+DATAFRAME_FORMATS = (Format.CSV, Format.CSV_GZIP, Format.PARQUET_GZIP)  # Dataframe formats
+
+
+class Montage(enum.Enum):
+    MONOPOLAR = 'mono'
+    BIPOLAR = 'bipolar'
+
+
+def _electrodeSynonymRegex(electrode: str) -> str:
+    """Build a regex that matches the different synonims of an electrode name."""
+    if electrode == 'T3' or electrode == 'T7':
+        electrode = '(T3|T7)'
+    elif electrode == 'T4' or electrode == 'T8':
+        electrode = '(T4|T8)'
+    elif electrode == 'T5' or electrode == 'P7':
+        electrode = '(T5|P7)'
+    elif electrode == 'T6' or electrode == 'P8':
+        electrode = '(T6|P8)'
+
+    return electrode
+
+
+def _getChannelIndices(channels: list[str], electrodes: tuple[str] = ELECTRODES,
+                       inputMontage: Montage = Montage.MONOPOLAR) -> list[int]:
     """Finds the index of each electrode in the list of channels
 
     Args:
@@ -40,60 +72,19 @@ def _getChannelIndices(channels: list[str], electrodes: tuple[str] = ELECTRODES)
         found = False
 
         # Some channel have diffrent names in different datasets.
-        if electrode == 'T3' or electrode == 'T7':
-            electrode = '(T3|T7)'
-        elif electrode == 'T4' or electrode == 'T8':
-            electrode = '(T4|T8)'
-        elif electrode == 'T5' or electrode == 'P7':
-            electrode = '(T5|P7)'
-        elif electrode == 'T6' or electrode == 'P8':
-            electrode = '(T6|P8)'
+        if inputMontage == Montage.MONOPOLAR:
+            electrode = _electrodeSynonymRegex(electrode)
+        elif inputMontage == Montage.BIPOLAR:
+            electrode = electrode.split('-')
+            for i, elec in enumerate(electrode):
+                electrode[i] = _electrodeSynonymRegex(elec)
 
         for i, channel in enumerate(channels):
             # Regex on channel name
-            if re.search(r'(EEG )?{}(-REF)?'.format(electrode), channel, flags=re.IGNORECASE):
-                found = True
-                break
-        if found:
-            chIndices.append(i)
-        else:
-            raise ValueError("Electrode {} was not found in EDF file".format(electrode))
-    return chIndices
-
-
-def _getChannelIndicesBipolar(channels: list[str], electrodes: tuple[str] = BIPOLAR_DBANANA) -> list[int]:
-    """Finds the index of bipolar channels in the list of channels
-
-    Args:
-        channels (list[str]): channels to extract indices
-        electrodes (tuple[str]): electrodes to find. Defaults are bipolar double banana of 10-20 system.
-
-    Raises:
-        ValueError: raised if the electrode is not in the list of channels.
-
-    Returns:
-        list[int]: List containing the indices to match the list of electrodes to the list of channels
-    """
-    chIndices = list()
-    for electrode in electrodes:
-        found = False
-
-        elecs = electrode.split('-')
-
-        # Some channel have diffrent names in different datasets.
-        for i, el in enumerate(elecs):
-            if el == 'T3' or el == 'T7':
-                elecs[i] = '(T3|T7)'
-            elif el == 'T4' or el == 'T8':
-                elecs[i] = '(T4|T8)'
-            elif el == 'T5' or el == 'P7':
-                elecs[i] = '(T5|P7)'
-            elif el == 'T6' or el == 'P8':
-                elecs[i] = '(T6|P8)'
-
-        for i, channel in enumerate(channels):
-            # Regex on channel name
-            regExToFind = elecs[0] + r'.*(-)?.*' + elecs[1]
+            if inputMontage == Montage.MONOPOLAR:
+                regExToFind = r'(EEG )?{}(-REF)?'.format(electrode)
+            elif inputMontage == Montage.BIPOLAR:
+                regExToFind = electrode[0] + r'.*(-)?.*' + electrode[1]
             if re.search(regExToFind, channel, flags=re.IGNORECASE):
                 found = True
                 break
@@ -104,21 +95,21 @@ def _getChannelIndicesBipolar(channels: list[str], electrodes: tuple[str] = BIPO
     return chIndices
 
 
-def loadEdf(edfFile: str, electrodes: tuple[str] = ELECTRODES, targetFs: int = FS, origMontage: str = 'mono',
+def loadEdf(edfFile: str, electrodes: tuple[str] = ELECTRODES, targetFs: int = FS, inputMontage: Montage = Montage.MONOPOLAR,
             ref: str = 'Cz') -> np.ndarray:
-    """Load an EDF file and return a numpy array corresponding to provided list of electrodes and sample frequency and
-    re-referenced to Cz
+    """Load an EDF file and return a numpy array corresponding to provided list of electrodes, at a given sample frequency and
+    re-referenced to ref
 
     Args:
         edfFile (str): path to the EDF file
         electrodes (tuple[str]): list of electrodes to load. Defaults to the 19 electrodes of the 10-20 system.
         targetFs (int, optional): sampling frequency. Defaults to 256.
-        origMontage (str, optional): if original montage is bipolar then different search for channels. Default is 'mono'.
-        ref (str, optional): reference electrode, should be in the list of electrodes (for a unipolar montage) or the string
+        inputMontage (Montage, optional): montage of dataset to load. Default is monopolar.
+        ref (str, optional): reference electrode, should be in the list of electrodes (for a monopolar montage) or the string
                              'bipolar-dBanana' (for a double banana bipolar montage). Defaults to 'Cz'.
 
     Raises:
-        ValueError: raised if ref is neither in the list of electrodes (unipolar) nor the string 'bipolar-dBanana' (bipolar).
+        NotImplementedError: when trying to load bipolar data to something else than a bipolar-dBanana.
 
     Returns:
         np.ndarray: 2D array of data [channels, samples]
@@ -126,10 +117,7 @@ def loadEdf(edfFile: str, electrodes: tuple[str] = ELECTRODES, targetFs: int = F
     with pyedflib.EdfReader(edfFile) as edf:
         # Get channel indices
         channels = edf.getSignalLabels()
-        if origMontage == 'mono':
-            chIndices = _getChannelIndices(channels, electrodes)
-        else:  # bipolar
-            chIndices = _getChannelIndicesBipolar(channels, electrodes)
+        chIndices = _getChannelIndices(channels, electrodes, inputMontage)
 
         # Get Fs
         fs = edf.getSampleFrequencies()
@@ -146,69 +134,74 @@ def loadEdf(edfFile: str, electrodes: tuple[str] = ELECTRODES, targetFs: int = F
 
         # Re-reference
         eegData = np.array(eegData)
-        if (origMontage == 'mono' and ref in electrodes):  # It was unipolar and needs to be unipolar but rereferenced
+        if inputMontage == Montage.MONOPOLAR and ref in electrodes:
             refI = electrodes.index(ref)
             eegData -= eegData[refI]
-        elif (origMontage == 'mono' and ref == 'bipolar-dBanana'):  # It was unipolar and needs to be bipolar
-            # Create reReferencing matrix
+            # TODO add re-referencing to common average.
+        elif inputMontage == Montage.MONOPOLAR and ref == 'bipolar-dBanana':  # It was monopolar and needs to be bipolar
+            # Create re-Referencing matrix
             reRefMatrix = np.zeros((len(BIPOLAR_DBANANA), len(electrodes)))
             for i, pair in enumerate(BIPOLAR_DBANANA):
                 elecs = pair.split('-')
                 reRefMatrix[i, electrodes.index(elecs[0])] = 1
                 reRefMatrix[i, electrodes.index(elecs[1])] = -1
             eegData = reRefMatrix @ eegData  # matrix multiplication
-        # last case is that it is already bipolar and needs to be exported as bipolar
-        # else:
-        #     raise ValueError("ref should either be one electrode (for a unipolar montage) or the string 'bipolar-dBanana' "
-        #                      "(for a double banana bipolar montage).")
+        elif inputMontage == Montage.BIPOLAR and ref == 'bipolar-dBanana' and electrodes.SequenceEqual(BIPOLAR_DBANANA):
+            # Currently only supports loading bipolar data if target is bipolar-dBanana.
+            pass
+        else:
+            raise NotImplementedError("Currently bipolar data can only be converted to a standard bipolar-dBanana montage.")
 
     return eegData
 
 
 def standardizeFileToEdf(edfFile: str, outFile: str, electrodes: tuple[str] = ELECTRODES, fs: int = FS,
-                         origMontage: str = 'mono', ref: str = 'Cz'):
-    """Standardize an EDF file.
+                         inputMontage: Montage = Montage.MONOPOLAR, ref: str = 'Cz'):
+    """Convert an EEG EDF file to a standardized EDF.
+
+    The function allows loading monopolar or bipolar EDF files (specified by `inputMontage`).
+    The data is then converted to a standardized sampling frequency (`fs`) and re-referenced according to `electrodes` and
+    `ref`. The data is then saved to EDF.
 
     Args:
         edfFile (str): path to the input EDF file
-        outFile (str): path to the output EDF file
-        electrodes (tuple[str]): list of electrodes to load. Defaults to the 19 electrodes of the 10-20 system.
+        outFile (str): path to the output file
+        electrodes (tuple[str], optional): list of electrodes to load. Defaults to the 19 electrodes of the 10-20 system.
         fs (int, optional): sampling frequency. Defaults to 256.
-        origMontage (str, optional): if original montage is bipolar then different search for channels. Default is 'mono'.
-        ref (str, optional): reference electrode, should be in the list of electrodes (for a unipolar montage) or the string
+        inputMontage (Montage, optional): montage of dataset to load. Default is monopolar.
+        ref (str, optional): reference electrode. Should be in the list of electrodes (for a monopolar montage) or the string
                              'bipolar-dBanana' (for a double banana bipolar montage). Defaults to 'Cz'.
 
     Raises:
-        ValueError: raised if ref is neither in the list of electrodes (unipolar) nor the string 'bipolar-dBanana' (bipolar).
+        ValueError: raised if ref is neither in the list of electrodes (monopolar) nor the string 'bipolar-dBanana' (bipolar).
     """
-    eegData = loadEdf(edfFile, electrodes, fs, origMontage, ref)
+    eegData = loadEdf(edfFile, electrodes, fs, inputMontage, ref)
 
     # Build headers
     with pyedflib.EdfReader(edfFile) as edf:
         # Get channel indices
         channels = edf.getSignalLabels()
-        if origMontage == 'mono':
-            chIndices = _getChannelIndices(channels, electrodes)
-        else:  # if bipolar montage in orginal dataset
-            chIndices = _getChannelIndicesBipolar(channels, electrodes)
+        chIndices = _getChannelIndices(channels, electrodes, inputMontage)
 
-        # renaming original headers from edf files to update sampl freq and channel names
+        # rename original headers from edf files to update sample frequency and channel names
         signalHeaders = list()
         for i in range(len(eegData)):
             signalHeader = edf.getSignalHeader(chIndices[i])
+            # Channel Label
             if ref in electrodes:
-                signalHeader['label'] = electrodes[i]
+                signalHeader['label'] = '{}-{}'.format(electrodes[i], ref)
             elif ref == 'bipolar-dBanana':
                 signalHeader['label'] = BIPOLAR_DBANANA[i]
             else:
-                raise ValueError("ref should either be one electrode (for a unipolar montage) or the string 'bipolar-dBanana'"
+                raise ValueError("ref should either be an electrode (for a monopolar montage) or the string 'bipolar-dBanana'"
                                  " (for a double banana bipolar montage).")
+            # Channel Fs (old and new pyedflib names)
             signalHeader['sample_frequency'] = fs
             signalHeader['sample_rate'] = signalHeader['sample_frequency']
-            # Check for phys_maxima
+            # Update physical extrema (could change due to re-referencing)
             if np.max(eegData[i]) > signalHeader['physical_max'] or np.min(eegData[i]) < signalHeader['physical_min']:
                 newMax = np.ceil(np.max(np.abs(eegData[i])))
-                signalHeader['physical_min'] = -1 * newMax  # TODO why is min -max and not real min?
+                signalHeader['physical_min'] = -1 * newMax
                 signalHeader['physical_max'] = newMax
             signalHeaders.append(signalHeader)
 
@@ -223,139 +216,149 @@ def standardizeFileToEdf(edfFile: str, outFile: str, electrodes: tuple[str] = EL
 
 
 def standardizeFileToDataFrame(edfFile: str, outFile: str, electrodes: tuple[str] = ELECTRODES, fs: int = FS,
-                               origMontage: str = 'mono', ref: str = 'Cz', outFormat: str = 'parquet.gzip'):
-    """Standardize EEG data to parquet.gzip file.
+                               inputMontage: Montage = Montage.MONOPOLAR, ref: str = 'Cz',
+                               outDataFrameFormat: Format = Format.PARQUET_GZIP):
+    """Convert an EEG EDF file to a standardized DataFrame format.
+
+    The function allows loading monopolar or bipolar EDF files (specified by `inputMontage`).
+    The data is then converted to a standardized sampling frequency (`fs`) and re-referenced according to `electrodes` and
+    `ref`. The data is then saved in one of the supported formats (outFormat: Format).
 
     Args:
         edfFile (str): path to the input EDF file
-        outFile (str): path to the output EDF file
-        electrodes (tuple[str]): list of electrodes to load. Defaults to the 19 electrodes of the 10-20 system.
+        outFile (str): path to the output file
+        electrodes (tuple[str], optional): list of electrodes to load. Defaults to the 19 electrodes of the 10-20 system.
         fs (int, optional): sampling frequency. Defaults to 256.
-        origMontage (str, optional): if original montage is bipolar then different search for channels. Default is 'mono'.
-        ref (str, optional): reference electrode, should be in the list of electrodes (for a unipolar montage) or the string
+        inputMontage (Montage, optional): montage of dataset to load. Default is monopolar.
+        ref (str, optional): reference electrode. Should be in the list of electrodes (for a monopolar montage) or the string
                              'bipolar-dBanana' (for a double banana bipolar montage). Defaults to 'Cz'.
-        outFormat (str, optional): format of output file. Default is 'edf', and possibilities are 'parquet.gzip', 'csv.gzip'
-                                   and 'csv'.
+        outDataFrameFormat (Format, optional): format of the output file. Supported formats are csv, csv.gzip, parquet.gzip.
+                                      Default is parquet.gzip.
 
     Raises:
-        ValueError: raised if ref is neither in the list of electrodes (unipolar) nor the string 'bipolar-dBanana' (bipolar).
+        ValueError: raised if ref is neither in the list of electrodes (monopolar) nor the string 'bipolar-dBanana' (bipolar).
+        ValueError: if outDataFrameFormat is unknown
     """
-    eegData = loadEdf(edfFile, electrodes, fs, origMontage, ref)
+    eegData = loadEdf(edfFile, electrodes, fs, inputMontage, ref)
 
     # Create dataframe with new channel names
-    if ref == 'bipolar-dBanana' or origMontage != 'mono':
+    if ref in electrodes:
+        dataDF = pd.DataFrame(data=eegData.transpose(), columns=('{}-{}'.format(x, ref) for x in electrodes))
+    elif ref == 'bipolar-dBanana':
         dataDF = pd.DataFrame(data=eegData.transpose(), columns=BIPOLAR_DBANANA)
-    elif ref in electrodes:
-        dataDF = pd.DataFrame(data=eegData.transpose(), columns=electrodes)
     else:
-        print('ERROR: monopolar montage chosen but ref electrode not available!')  # TODO make exception
+        raise ValueError("ref should either be an electrode (for a monopolar montage) or the string 'bipolar-dBanana'"
+                         " (for a double banana bipolar montage).")
+
+    # TODO check if extra metadata can be added to the different DataFrame formats
 
     # Create directory for file
     os.makedirs(os.path.dirname(outFile), exist_ok=True)
     # Write new file
-    try:
-        if outFormat == 'parquet.gzip':  # parquet gzip
-            dataDF.to_parquet(outFile[:-4] + '.' + outFormat, index=False, compression='gzip')
-        elif (outFormat == 'csv.gzip'):
-            dataDF.to_csv(outFile[:-4] + '.' + outFormat, index=False, compression='gzip')
-        elif (outFormat == 'csv'):
-            dataDF.to_csv(outFile[:-4] + '.' + outFormat, index=False)
-    except ValueError as exception:
-        print('{}: {}'.format(exception, edfFile))
+    if outDataFrameFormat == Format.PARQUET_GZIP:
+        dataDF.to_parquet(outFile, index=False, compression='gzip')
+    elif outDataFrameFormat == Format.CSV_GZIP:
+        dataDF.to_csv(outFile, index=False, compression='gzip')
+    elif outDataFrameFormat == Format.CSV:
+        dataDF.to_csv(outFile, index=False)
+    else:
+        raise ValueError('Unknown output format {}'.format(outDataFrameFormat))
 
 
-def standardizeFile(edfFile: str, outFile: str, electrodes: tuple[str] = ELECTRODES, fs: int = FS, origMontage: str = 'mono',
-                    ref: str = 'Cz', outFormat: str = 'parquet.gzip'):
-    """Standardize EEG data to output file. Type of output file depends on type parameter.
+def standardizeFile(edfFile: str, outFile: str, electrodes: tuple[str] = ELECTRODES, fs: int = FS,
+                    inputMontage: Montage = Montage.MONOPOLAR, ref: str = 'Cz', outFormat: Format = Format.EDF):
+    """Convert an EEG EDF file to a standardized format.
+
+    The function allows loading monopolar or bipolar EDF files (specified by `inputMontage`).
+    The data is then converted to a standardized sampling frequency (`fs`) and re-referenced according to `electrodes` and
+    `ref`. The data is then saved in one of the supported formats (outFormat: Format).
 
     Args:
         edfFile (str): path to the input EDF file
-        outFile (str): path to the output EDF file
-        electrodes (tuple[str]): list of electrodes to load. Defaults to the 19 electrodes of the 10-20 system.
+        outFile (str): path to the output file
+        electrodes (tuple[str], optional): list of electrodes to load. Defaults to the 19 electrodes of the 10-20 system.
         fs (int, optional): sampling frequency. Defaults to 256.
-        origMontage (str, optional): if original montage is bipolar then different search for channels. Default is 'mono'.
-        ref (str, optional): reference electrode, should be in the list of electrodes (for a unipolar montage) or the string
+        inputMontage (Montage, optional): montage of dataset to load. Default is monopolar.
+        ref (str, optional): reference electrode. Should be in the list of electrodes (for a monopolar montage) or the string
                              'bipolar-dBanana' (for a double banana bipolar montage). Defaults to 'Cz'.
-        outFormat (str, optional): format of output file. Default is 'edf', and possibilities are 'parquet.gzip', 'csv.gzip'
-                                   and 'csv'.
+        outFormat (Format, optional): format of the output file. Supported formats are edf, csv, csv.gzip, parquet.gzip.
+                                      Default is edf.
 
     Raises:
-        ValueError: raised if ref is neither in the list of electrodes (unipolar) nor the string 'bipolar-dBanana' (bipolar).
+        ValueError: if outDataFrameFormat is unknown.
     """
-    if origMontage != 'mono':  # if person didnt specify electrodes to search, put to bipolar
-        electrodes = BIPOLAR_DBANANA
-        ref = 'bipolar-dBanana'
-
-    try:
-        if outFormat == 'edf':
-            standardizeFileToEdf(edfFile, outFile, electrodes, fs, origMontage, ref)
-        else:  # other formats but edf
-            standardizeFileToDataFrame(edfFile, outFile, electrodes, fs, origMontage, ref, outFormat)
-    except ValueError as exception:
-        print('{}: {}'.format(exception, edfFile))
+    if outFormat == Format.EDF:
+        standardizeFileToEdf(edfFile, outFile, electrodes, fs, inputMontage, ref)
+    elif outFormat in DATAFRAME_FORMATS:
+        standardizeFileToDataFrame(edfFile, outFile, electrodes, fs, inputMontage, ref, outFormat)
+    else:
+        raise ValueError('Unknown output format {}'.format(outFormat))
 
 
-def standardizeDataset(rootDir: str, outDir: str, electrodes: tuple[str] = ELECTRODES, fs: int = FS, origMontage: str = 'mono',
-                       ref: str = 'Cz', outFormat: str = 'edf'):
-    """Converts a full dataset to the standard EEG format but exports as dataFrame in parquet.gzip format.
+def standardizeDataset(rootDir: str, outDir: str, electrodes: tuple[str] = ELECTRODES, fs: int = FS,
+                       inputMontage: Montage = Montage.MONOPOLAR, ref: str = 'Cz', outFormat: Format = Format.EDF):
+    """Converts a full dataset to the standard EEG format.
+    ! If conversion of a file fails, a logging error is printed and processing of other files continues.
 
     Args:
         rootDir (str): root directory of the original dataset
         outDir (str): root directory of the converted dataset. The data structure of the original dataset is preserved.
         electrodes (tuple[str], optional): list of electrodes to load. Defaults to the 19 electrodes of the 10-20 system.
         fs (int, optional): sampling frequency. Defaults to 256.
-        origMontage (str, optional): if original montage is bipolar then different search for channels. Default is 'mono'.
-        ref (str, optional): reference electrode, should be in the list of electrodes (for a unipolar montage) or the string
+        inputMontage (Montage, optional): montage of dataset to load. Default is monopolar.
+        ref (str, optional): reference electrode, should be in the list of electrodes (for a monopolar montage) or the string
                              'bipolar-dBanana' (for a double banana bipolar montage). Defaults to 'Cz'.
-        outFormat (str, optional): format of output file. Default is 'edf', and possibilities are 'parquet.gzip', 'csv.gzip'
-                                   and 'csv'.
-    """
-    if origMontage != 'mono':  # if person didnt specify electrodes to search, put to bipolar
-        electrodes = BIPOLAR_DBANANA
-        ref = 'bipolar-dBanana'
+        outFormat (Format, optional): format of output file. Supported formats are edf, csv, csv.gzip, parquet.gzip.
+                                      Default is edf.
 
+    Raises:
+        ValueError: if outDataFrameFormat is unknown.
+    """
     # Go through all files
-    # edfFiles = glob.iglob(os.path.join(rootDir, '**/*.edf'), recursive=True)
-    edfFiles = np.sort(glob.glob(os.path.join(rootDir, '**/*.edf'), recursive=True))
+    edfFiles = glob.iglob(os.path.join(rootDir, '**/*.edf'), recursive=True)
     for edfFile in edfFiles:
-        outFile = outDir + edfFile[len(rootDir):]  # swap rootDir for outDir
         try:
-            if outFormat == 'edf':
-                standardizeFileToEdf(edfFile, outFile, electrodes, fs, origMontage, ref)
-            else:  # other formats but edf
-                standardizeFileToDataFrame(edfFile, outFile, electrodes, fs, origMontage, ref, outFormat)
-            print('Exported:' + outFile)
+            if outFormat == Format.EDF:
+                outFile = os.path.join(outDir, edfFile[len(rootDir):])
+                standardizeFileToEdf(edfFile, outFile, electrodes, fs, inputMontage, ref)
+            elif outFormat in DATAFRAME_FORMATS:
+                outFile = os.path.joing(outDir, edfFile[len(rootDir):-4] + outFormat)
+                standardizeFileToDataFrame(edfFile, outFile, electrodes, fs, inputMontage, ref, outFormat)
+            else:
+                raise ValueError('Unknown output format {}'.format(outFormat))
+            logging.info('Converted {}'.format(edfFile))
         except ValueError as exception:
-            print('{}: {}'.format(exception, edfFile))
+            logging.error('Error converting {} \n {}'.format(edfFile, exception))
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         prog='EDF format standardization',
-        description="Converts EDF files in a referential montage to a standardized list of electrodes and channel names. "
+        description="Converts EDF files in a montage to a standardized list of electrodes and channel names. "
                     "Two formats are allowed : either conversion of full datasets by providing a directory name as input and "
-                    "output or conversion of individual files by providing an edf file as input out output"
+                    "conversion of individual files by providing an edf file as input"
     )
     parser.add_argument('input',
                         help="either the root directory of the original dataset or the input edf file.")
     parser.add_argument('output',
-                        help="either the root directory of the converted dataset or the output edf file."
+                        help="either the root directory of the converted dataset or the output filename."
                              " The data structure of the original dataset is preserved.")
     parser.add_argument('-e', '--electrodes',
                         help="List of electrodes. These should be provided as comma-separated-values. By default uses"
                         " the 19 electrodes of the 10-20 system.")
     parser.add_argument('-f', '--fs',
                         help="Sampling frequency for the converted data. Defaults to 256 Hz.", type=int, default=256)
-    parser.add_argument('-m', '--origMontage',
-                        help="What is original montage of the dataset, if uni(mono)polar - 'mono', if bipolar - 'bipolar'. "
+    parser.add_argument('-m', '--inputMontage',
+                        help="Montage of the input, if uni(mono)polar - 'mono', if bipolar - 'bipolar'. "
                              "Defaults 'mono'",
                         default='mono')
     parser.add_argument('-r', '--ref',
-                        help="Reference for the converted data. Should be in the list of electrodes (for a unipolar montage) "
+                        help="Reference for the converted data. Should be in the list of electrodes (for a monopolar montage) "
                              "or the string 'bipolar-dBanana' (for a double banana bipolar montage). Defaults to 'Cz'",
                         default='Cz')
-    parser.add_argument('-o', '--outFile',
-                        help="Format of output file if not edf. Default is .edf ",
+    parser.add_argument('-o', '--outFormat',
+                        help="Format of the output file. Should be one of 'edf', 'csv, 'csv.gzip', 'parquet.gzip'. "
+                             "Default is .edf ",
                         default='edf')
     args = parser.parse_args()
 
@@ -366,6 +369,6 @@ if __name__ == '__main__':
         args.electrodes = ELECTRODES
 
     if os.path.isdir(args.input):
-        standardizeDataset(args.input, args.output, args.electrodes, args.fs, args.origMontage, args.ref, args.outFile)
+        standardizeDataset(args.input, args.output, args.electrodes, args.fs, args.inputMontage, args.ref, args.outFormat)
     else:
-        standardizeFile(args.input, args.output, args.electrodes, args.fs, args.origMontage, args.ref, args.outFile)
+        standardizeFile(args.input, args.output, args.electrodes, args.fs, args.inputMontage, args.ref, args.outFormat)
