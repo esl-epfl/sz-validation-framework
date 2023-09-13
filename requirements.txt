@@ -1,0 +1,7 @@
+matplotlib
+nptyping
+numpy
+pandas
+pyedflib
+resampy
+timescoring
