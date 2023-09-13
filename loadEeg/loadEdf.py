@@ -24,7 +24,7 @@ ELECTRODES = ('Fp1', 'F3', 'C3', 'P3', 'O1', 'F7', 'T3', 'T5', 'Fz', 'Cz', 'Pz',
 FS = 256
 
 
-class Format(enum.Enum):
+class Format(str, enum.Enum):
     CSV = 'csv'
     CSV_GZIP = 'csv.gzip'
     EDF = 'edf'
@@ -34,7 +34,7 @@ class Format(enum.Enum):
 DATAFRAME_FORMATS = (Format.CSV, Format.CSV_GZIP, Format.PARQUET_GZIP)  # Dataframe formats
 
 
-class Montage(enum.Enum):
+class Montage(str, enum.Enum):
     MONOPOLAR = 'mono'
     BIPOLAR = 'bipolar'
 
@@ -146,7 +146,7 @@ def loadEdf(edfFile: str, electrodes: tuple[str] = ELECTRODES, targetFs: int = F
                 reRefMatrix[i, electrodes.index(elecs[0])] = 1
                 reRefMatrix[i, electrodes.index(elecs[1])] = -1
             eegData = reRefMatrix @ eegData  # matrix multiplication
-        elif inputMontage == Montage.BIPOLAR and ref == 'bipolar-dBanana' and electrodes.SequenceEqual(BIPOLAR_DBANANA):
+        elif inputMontage == Montage.BIPOLAR and ref == 'bipolar-dBanana' and electrodes == BIPOLAR_DBANANA:
             # Currently only supports loading bipolar data if target is bipolar-dBanana.
             pass
         else:
@@ -210,7 +210,8 @@ def standardizeFileToEdf(edfFile: str, outFile: str, electrodes: tuple[str] = EL
         edf._close()
 
     # Create directory for file
-    os.makedirs(os.path.dirname(outFile), exist_ok=True)
+    if os.path.dirname(outFile):
+        os.makedirs(os.path.dirname(outFile), exist_ok=True)
     # Write new EDF file
     pyedflib.highlevel.write_edf(outFile, eegData, signalHeaders, recordingHeader)
 
@@ -253,7 +254,8 @@ def standardizeFileToDataFrame(edfFile: str, outFile: str, electrodes: tuple[str
     # TODO check if extra metadata can be added to the different DataFrame formats
 
     # Create directory for file
-    os.makedirs(os.path.dirname(outFile), exist_ok=True)
+    if os.path.dirname(outFile):
+        os.makedirs(os.path.dirname(outFile), exist_ok=True)
     # Write new file
     if outDataFrameFormat == Format.PARQUET_GZIP:
         dataDF.to_parquet(outFile, index=False, compression='gzip')
@@ -322,7 +324,7 @@ def standardizeDataset(rootDir: str, outDir: str, electrodes: tuple[str] = ELECT
                 outFile = os.path.join(outDir, edfFile[len(rootDir):])
                 standardizeFileToEdf(edfFile, outFile, electrodes, fs, inputMontage, ref)
             elif outFormat in DATAFRAME_FORMATS:
-                outFile = os.path.joing(outDir, edfFile[len(rootDir):-4] + outFormat)
+                outFile = os.path.join(outDir, edfFile[len(rootDir):-3] + outFormat)
                 standardizeFileToDataFrame(edfFile, outFile, electrodes, fs, inputMontage, ref, outFormat)
             else:
                 raise ValueError('Unknown output format {}'.format(outFormat))
@@ -365,6 +367,8 @@ if __name__ == '__main__':
     # Convert list of electrodes to list
     if args.electrodes is not None:
         args.electrodes = args.electrodes.split(',')
+    elif args.inputMontage == Montage.BIPOLAR:
+        args.electrodes = BIPOLAR_DBANANA
     else:
         args.electrodes = ELECTRODES
 
