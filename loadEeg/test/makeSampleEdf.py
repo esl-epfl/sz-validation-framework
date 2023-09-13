@@ -1,3 +1,6 @@
+"""Script to build a small sample EDF from an EDF recording. The recording header and list of signals are kept the same.
+The content of data is white noise. The output file is named input_sample.edf
+"""
 import argparse
 
 import numpy as np
