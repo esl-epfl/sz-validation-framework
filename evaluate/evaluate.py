@@ -25,7 +25,7 @@ def dfToEvents(df: pd.DataFrame) -> list[tuple[float, float]]:
             events.append((row.startTime, row.endTime))
     return events
 
-def evaluate2AnnotationFiles(refFilename: str, hypFilename: str, labelFreq,  params) -> pd.DataFrame:
+def evaluate2AnnotationFiles(refFilename: str, hypFilename: str, annotationsInTrainFilename, labelFreq,  params) -> pd.DataFrame:
     ''' Compares two annotation files in the same format. One are reference true annotations and other
     one are predicted hypothesis by the ML algorithm. Goes one by one file in the annotations file and performs matching of
     the true and predicted labels and calculated various performances for individual file in annotations files.
@@ -63,12 +63,21 @@ def evaluate2AnnotationFiles(refFilename: str, hypFilename: str, labelFreq,  par
         'filepath': [],
     }
 
-    refDf = pd.read_csv(refFilename)
-    hypDf = pd.read_csv(hypFilename)
+    refDf = pd.read_csv(refFilename, dtype={'session': 'object'})
+    hypDf = pd.read_csv(hypFilename, dtype={'session': 'object'})
+    if annotationsInTrainFilename!=[]:
+        trainDf = pd.read_csv(annotationsInTrainFilename, dtype={'session': 'object'})
+        refDf = pd.concat([refDf, trainDf])
+        refDf.sort_values(by=['subject', 'session'])
+        refDf=refDf.drop_duplicates(keep=False, inplace= False)
 
     for filepath, _ in refDf.groupby(['filepath']):
         # fs = 256
-        nSamples = round(refDf[refDf.filepath == filepath].duration.iloc[0] * labelFreq)
+        try:
+            nSamples = round(refDf[refDf.filepath == filepath].duration.iloc[0] * labelFreq)
+        except:
+            print ('a')
+            print(filepath)
 
         # Convert annotations
         ref = Annotation(dfToEvents(refDf[refDf.filepath == filepath]), labelFreq, nSamples)
@@ -102,7 +111,7 @@ def evaluate2AnnotationFiles(refFilename: str, hypFilename: str, labelFreq,  par
     return pd.DataFrame(results)
 
 # def  recalculatePerfPerSubject(performancePerFile, subjects, labelFreq):
-def recalculatePerfPerSubject(performancePerFile, subjects, labelFreq, params):
+def recalculatePerfPerSubject(performancePerFileName, subjects, labelFreq, params):
     ''' Uses output from evaluate2AnnotationFiles which contains performance per each file of the dataset,
     and calculated performance per subject.
 
@@ -136,6 +145,7 @@ def recalculatePerfPerSubject(performancePerFile, subjects, labelFreq, params):
         'SampleEvent_f1mean': [],
         'SampleEvent_f1gmean': [],
     }
+    performancePerFile=pd.read_csv(performancePerFileName)
 
     for patIndx, pat in enumerate(subjects):
         dataThisSubj = performancePerFile.loc[performancePerFile['filepath'].str.contains(pat, case=False)].reset_index( drop=True)
@@ -278,8 +288,12 @@ def createAnnotationFileFromPredictions(data, annotationTrue, labelColumnName):
             annotationAllPred = pd.concat([annotationAllPred, fullRowDF], axis=0)
         else:
             for i, s in enumerate(startIndx):
-                startTime=dataThisFile.loc[startIndx[i],'Time']-datetime.datetime.strptime(fixInfo.loc[indxAnnotTrue[0],'dateTime'],  "%Y-%m-%d %H:%M:%S")
-                endTime = dataThisFile.loc[endIndx[i], 'Time'] - datetime.datetime.strptime(fixInfo.loc[indxAnnotTrue[0], 'dateTime'],   "%Y-%m-%d %H:%M:%S")
+                try:
+                    startTime=dataThisFile.loc[startIndx[i],'Time']-datetime.datetime.strptime(fixInfo.loc[indxAnnotTrue[0],'dateTime'],  "%Y-%m-%d %H:%M:%S")
+                    endTime = dataThisFile.loc[endIndx[i], 'Time'] - datetime.datetime.strptime(fixInfo.loc[indxAnnotTrue[0], 'dateTime'],   "%Y-%m-%d %H:%M:%S")
+                except:
+                    startTime = dataThisFile.loc[startIndx[i], 'Time'] - datetime.datetime.strptime(fixInfo.loc[indxAnnotTrue[0], 'dateTime'], "%Y-%m-%d")
+                    endTime = dataThisFile.loc[endIndx[i], 'Time'] - datetime.datetime.strptime(fixInfo.loc[indxAnnotTrue[0], 'dateTime'], "%Y-%m-%d")
                 if (startTime.total_seconds()<0 or endTime.total_seconds()<0):
                     print('time negative ')
                 avrgConf= np.mean(data.loc[startIndx[i]:endIndx[i], 'ProbabLabels'].to_numpy())
@@ -289,3 +303,30 @@ def createAnnotationFileFromPredictions(data, annotationTrue, labelColumnName):
                 annotationAllPred=pd.concat([annotationAllPred,fullRowDF], axis=0)
 
     return(annotationAllPred)
+
+
+def extractTrainFiles( annotationsTrue, minHoursTrain, subj):
+    thisSubj=annotationsTrue.loc[annotationsTrue['subject'] == subj].reset_index(drop=True)
+    thisSubj = thisSubj.sort_values(by=['subject', 'session'])
+
+    annotationsInTrain=pd.DataFrame()
+    timeLeft=minHoursTrain*3600
+    l=0
+    while l< len(thisSubj.index): #go through rows
+        if (thisSubj['duration'][l]<= timeLeft): #full file can be used
+            #find rows with this file
+            rows = thisSubj.loc[thisSubj['session'] == thisSubj['session'][l] ].reset_index(drop=True)
+            rows = rows.loc[rows['recording'] == thisSubj['recording'][  l]].reset_index(drop=True)
+            # annotationsInTrain = pd.concat([annotationsInTrain, thisSubj.loc[[0]]], axis=0)
+            annotationsInTrain = pd.concat([annotationsInTrain, rows], axis=0)
+            timeLeft=timeLeft - thisSubj['duration'][l]
+            l=l+ len(rows.index)
+        else: #if session should be split
+            rows = thisSubj.loc[thisSubj['session'] == thisSubj['session'][l]].reset_index(drop=True)
+            rows = rows.loc[rows['recording'] == thisSubj['recording'][l]].reset_index(drop=True)
+            rows = rows.loc[ rows['endTime']<timeLeft]
+            annotationsInTrain = pd.concat([annotationsInTrain, rows], axis=0)
+            break
+
+    return (annotationsInTrain)
+
