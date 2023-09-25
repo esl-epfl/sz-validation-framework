@@ -3,15 +3,14 @@
 This library provides script to work with the framework for the validation of EEG based automated seizure detection algorithms proposed [here](https://eslweb.epfl.ch/epilepsybenchmarks/framework-for-validation-of-epileptic-seizure-detection-algorithms/).
 
 The library provides code to :
+
 1. Convert EDF files from most open scalp EEG datasets of people with epilepsy to a standardized format
 2. Convert seizure annotations from these datasets to a standardized format.
 3. Evaluate the performance of seizure detection algorithm.
 
-
 ## Installation
 
 Packages for the library will be provided once the code is stable. In the meantime, a list of dependencies are listed in [requirements.txt](https://github.com/esl-epfl/sz-validation-framework/blob/main/requirements.txt).
-
 
 ## Code
 
@@ -20,11 +19,13 @@ Packages for the library will be provided once the code is stable. In the meanti
 `loadEeg/loadEdf.py` contains the code to load and convert EDF files from common scalp EEG datasets ([Physionet CHB-MIT](https://physionet.org/content/chbmit/1.0.0/), [Physionet Siena Scalp EEG](https://physionet.org/content/siena-scalp-eeg/1.0.0/), [TUH EEG Sz Corpus](https://isip.piconepress.com/projects/tuh_eeg), [SeizeIT1](https://rdr.kuleuven.be/dataset.xhtml?persistentId=doi:10.48804/P5Q0OJ)) to a standardized format.
 
 The code can be used from the command line or as a python library. It can be used to :
+
 - `loadEdf`: load data in memory as a `numpy.ndarray`
 - `standardizeFile`: convert an EDF file to a standardized format
 - `standardizeDataset`: standardize an entire dataset to a standardized format
 
 #### Parameters
+
 The following parameters are common to most functions. They all provide sane defaults.
 
 - `electrodes` (`tuple[str]`, optional): list of electrodes to load. Defaults to the 19 electrodes of the 10-20 system. The constant `ELECTRODES` provides this tuple. The constant `BIPOLAR_DBANANA` provides the list of electrodes found in a double banana bipolar montage.
@@ -33,7 +34,9 @@ The following parameters are common to most functions. They all provide sane def
 - `ref` (`str`, optional): reference electrode. Should be in the list of electrodes (for a monopolar montage) or the string                             `'bipolar-dBanana'` (for a double banana bipolar montage). Defaults to `'Cz'`.
 
 #### Data Formats
+
 The library allows to store the standardized data in one of the following formats:
+
 - `EDF` (default)
 - `csv`
 - `csv.gzip`
@@ -42,14 +45,16 @@ The library allows to store the standardized data in one of the following format
 The output format is specified with the parameter `outFormat`
 
 #### Data re-referencing
+
 The library supports re-referencing from a monopolar montage to either a different reference electrode or to a double banana bipolar montage.
 
 Bipolar data can currently not be re-referenced and is expected to be provided in a double banana montage.
 
 #### Command line interface
+
 The library also provides a command line interface :
 
-```
+```text
 usage: EDF format standardization [-h] [-e ELECTRODES] [-f FS]
                                   [-m INPUTMONTAGE] [-r REF] [-o OUTFORMAT]
                                   input output
