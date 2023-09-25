@@ -18,6 +18,7 @@ import pandas as pd
 import pyedflib
 import numpy as np
 
+
 def _parseTimeStamp(string: str) -> float:
     """Parses timestamps from Siena annotation files and returns a float representing the time from the earliest system time.
 
@@ -65,17 +66,17 @@ def _loadSeizures(edfFile: str, subject: str, correctedEdfFileName: str) -> list
                         _ = summary.readline()
                         seizures.append((_substractTimeStamps(start, registrationStart),
                                         (_substractTimeStamps(end, registrationStart))))
-                elif correctedEdfFileName == 'PN00-3.edf': #seizure last 1hour
+                elif correctedEdfFileName == 'PN00-3.edf':  # seizure last 1hour
                     registrationStart = _parseTimeStamp(firstLine)
                     _ = summary.readline()
                     start = _parseTimeStamp(summary.readline())
                     end = _parseTimeStamp(summary.readline())
-                    end = _parseTimeStamp('Seizure end time: 18.29.29\n')  #correct time
+                    end = _parseTimeStamp('Seizure end time: 18.29.29\n')  # correct time
                     seizures.append((_substractTimeStamps(start, registrationStart),
                                      (_substractTimeStamps(end, registrationStart))))
-                elif correctedEdfFileName == 'PN10-7.8.9.edf': #seizure last 1hour
-                    if (firstLine== 'Registration start time:1 6.49.25\n'): #extra space
-                        firstLine='Registration start time:16.49.25\n'
+                elif correctedEdfFileName == 'PN10-7.8.9.edf':  # seizure last 1hour
+                    if (firstLine == 'Registration start time:1 6.49.25\n'):  # extra space
+                        firstLine = 'Registration start time:16.49.25\n'
                     registrationStart = _parseTimeStamp(firstLine)
                     _ = summary.readline()
                     start = _parseTimeStamp(summary.readline())
@@ -219,7 +220,7 @@ def convertAnnotationsEdf(rootDir: str, edfFile: str, outFile: str = None) -> pd
         annotations['channels'].append(channels)
         annotations['filepath'].append(filepath)
 
-        if (int(seizure[1])>duration): #end of seizure after end of the file
+        if (int(seizure[1]) > duration):  # end of seizure after end of the file
             print('ERROR: end of seizure after end of the file: ', filepath)
 
     annotationDf = pd.DataFrame(annotations)
@@ -261,8 +262,7 @@ def convertAnnotationsSubject(rootDir: str, subject: str, outFile: str = None) -
     }
     annotationDf = pd.DataFrame(annotations)
 
-    # edfFiles = glob.iglob(os.path.join(rootDir, subject, '*.edf'))
-    edfFiles = np.sort(glob.glob(os.path.join(rootDir, subject, '*.edf'))) #sort them
+    edfFiles = np.sort(glob.glob(os.path.join(rootDir, subject, '*.edf')))  # sort them
     for edfFile in edfFiles:
         edfAnnotations = convertAnnotationsEdf(rootDir, edfFile)
         annotationDf = pd.concat([annotationDf, edfAnnotations])
@@ -303,8 +303,7 @@ def convertAllAnnotations(rootDir: str, outFile: str = None) -> pd.DataFrame:
     }
     annotationDf = pd.DataFrame(annotations)
 
-    # edfFiles = glob.iglob(os.path.join(rootDir, '*/*.edf'))
-    edfFiles = np.sort(glob.glob(os.path.join(rootDir, '*/*.edf'))) #sort them
+    edfFiles = np.sort(glob.glob(os.path.join(rootDir, '*/*.edf')))  # sort them
     for edfFile in edfFiles:
         edfAnnotations = convertAnnotationsEdf(rootDir, edfFile)
         annotationDf = pd.concat([annotationDf, edfAnnotations])

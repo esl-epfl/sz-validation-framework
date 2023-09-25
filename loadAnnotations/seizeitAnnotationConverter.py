@@ -16,6 +16,7 @@ import pandas as pd
 import pyedflib
 import numpy as np
 
+
 def _loadSeizures(tsvFile: str) -> tuple:
     """Load seizures from a SeizeIT P_IDXX_rx_a2.tsv file"""
     seizures = []
@@ -158,8 +159,7 @@ def convertAnnotationsSubject(rootDir: str, subject: str, outFile: str = None) -
     }
     annotationDf = pd.DataFrame(annotations)
 
-    # edfFiles = glob.iglob(os.path.join(rootDir, subject, '*.edf'))
-    edfFiles = np.sort(glob.glob(os.path.join(rootDir, subject, '*.edf'))) #sort them
+    edfFiles = np.sort(glob.glob(os.path.join(rootDir, subject, '*.edf')))  # sort them
     for edfFile in edfFiles:
         edfAnnotations = convertAnnotationsEdf(rootDir, edfFile)
         annotationDf = pd.concat([annotationDf, edfAnnotations])
@@ -200,7 +200,6 @@ def convertAllAnnotations(rootDir: str, outFile: str = None) -> pd.DataFrame:
     }
     annotationDf = pd.DataFrame(annotations)
 
-    # edfFiles = glob.iglob(os.path.join(rootDir, '*/*.edf'))
     edfFiles = np.sort(glob.glob(os.path.join(rootDir, '*/*.edf')))  # sort them
     for edfFile in edfFiles:
         edfAnnotations = convertAnnotationsEdf(rootDir, edfFile)
