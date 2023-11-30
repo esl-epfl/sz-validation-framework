@@ -1,4 +1,4 @@
-"""Eeg class to manipulate EEG data and associated metadaata. The class interfaces with EDF files."""
+"""Eeg class to manipulate EEG data and associated metadata. The class interfaces with EDF files."""
 import datetime
 import enum
 import os
@@ -309,9 +309,7 @@ class Eeg:
         if os.path.dirname(file):
             os.makedirs(os.path.dirname(file), exist_ok=True)
         # Write new EDF file
-        pyedflib.highlevel.write_edf(
-            file, self.data, signalHeaders, self._fileHeader
-        )
+        pyedflib.highlevel.write_edf(file, self.data, signalHeaders, self._fileHeader)
 
     def saveDataFrame(self, file: str, format: FileFormat = FileFormat.PARQUET_GZIP):
         """Save Eeg object to a dataframe compatible file.
@@ -364,7 +362,9 @@ class Eeg:
 
         return electrode
 
-    def _findChannelIndex(channels: tuple[str], electrode: str, montage: Montage) -> int:
+    def _findChannelIndex(
+        channels: tuple[str], electrode: str, montage: Montage
+    ) -> int:
         """Finds the index of a channel given an electrode name.
 
         Args:
