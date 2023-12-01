@@ -302,8 +302,8 @@ class Eeg:
             signalHeaders.append(self._signalHeader.copy())
             signalHeaders[i]["label"] = channel
             signalHeaders[i]["sample_frequency"] = self.fs
-            signalHeaders[i]["physical_min"] = np.min(self.data[i])
-            signalHeaders[i]["physical_max"] = np.max(self.data[i])
+            signalHeaders[i]["physical_min"] = int(np.floor(np.min(self.data[i])))
+            signalHeaders[i]["physical_max"] = int(np.ceil(np.max(self.data[i])))
 
         # Create directory for file
         if os.path.dirname(file):
