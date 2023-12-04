@@ -1,100 +1,26 @@
 from datetime import datetime
 import enum
+import json
+import os
 from typing import TypedDict
 
 import numpy as np
 
+import dataIo
 
-# ILAE Seizure classification
-_SZ_TYPES = {
-    "sz": {
-        "foc": {
-            "a": {
-                "m": (
-                    "automatisms",
-                    "atonic",
-                    "clonic",
-                    "spasms",
-                    "hyperkinetic",
-                    "myoclonic",
-                    "tonic",
-                ),
-                "nm": ("automatic", "behavior", "cognitive", "emotional", "sensory"),
-                "f2b": (),
-                "um": (),
-            },
-            "ia": {
-                "m": (
-                    "automatisms",
-                    "atonic",
-                    "clonic",
-                    "spasms",
-                    "hyperkinetic",
-                    "myoclonic",
-                    "tonic",
-                ),
-                "nm": ("automatic", "behavior", "cognitive", "emotional", "sensory"),
-                "f2b": (),
-                "um": (),
-            },
-            "ua": {
-                "m": (
-                    "automatisms",
-                    "atonic",
-                    "clonic",
-                    "spasms",
-                    "hyperkinetic",
-                    "myoclonic",
-                    "tonic",
-                ),
-                "nm": ("automatic", "behavior", "cognitive", "emotional", "sensory"),
-                "f2b": (),
-                "um": (),
-            },
-        },
-        "gen": {
-            "m": (
-                "tonicClonic",
-                "clonic",
-                "tonic",
-                "myoTC",
-                "myoAtonic",
-                "atonic",
-                "spasms",
-            ),
-            "nm": ("automatic", "behavior", "cognitive", "emotional", "sensory"),
-            "um": (),
-        },
-        "uo": {"m": ("tonicClonic", "spasms"), "nm": ["behavior"], "um": ()},
-    }
-}
-SZ_TYPES = dict()
-for sz, focDict in _SZ_TYPES.items():
-    SZ_TYPES[sz] = sz
-    for focus, subDict in focDict.items():
-        label = "_".join((sz, focus))
-        if focus == "foc":
-            awareDict = subDict
-            for awareness, motorDict in awareDict.items():
-                label = "_".join((sz, focus, awareness))
-                SZ_TYPES[label] = label
-                for motor, clinics in motorDict.items():
-                    label = "_".join((sz, focus, awareness, motor))
-                    SZ_TYPES[label] = label
-                    for clinic in clinics:
-                        label = "_".join((sz, focus, awareness, motor, clinic))
-                        SZ_TYPES[label] = label
-        else:
-            motorDict = subDict
-            for motor, clinics in motorDict.items():
-                label = "_".join((sz, focus, motor))
-                SZ_TYPES[label] = label
-                for clinic in clinics:
-                    label = "_".join((sz, focus, motor, clinic))
-                    SZ_TYPES[label] = label
-SeizureType = enum.Enum("SeizureType", SZ_TYPES)
+# Load Seizure types defined in the HED-SCORE JSON event file
+PCKG_LOC = os.path.dirname(dataIo.__file__)
+szTypes = dict()
+with open(os.path.join(PCKG_LOC, "bids", "events.json"), "r") as f:
+    eventsJSON = json.load(f)
+    szTypes = eventsJSON["Levels"]
 
-EVENT_TYPES = SZ_TYPES.copy()
+for key, _ in szTypes.items():
+    szTypes[key] = key
+
+SeizureType = enum.Enum("SeizureType", szTypes)
+
+EVENT_TYPES = szTypes.copy()
 EVENT_TYPES["bckg"] = "bckg"
 EventType = enum.Enum("EventType", EVENT_TYPES)
 
