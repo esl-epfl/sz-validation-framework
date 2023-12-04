@@ -5,6 +5,7 @@ import os
 from typing import TypedDict
 
 import numpy as np
+import pandas as pd
 
 import dataIo
 
@@ -39,6 +40,32 @@ class Annotations:
     def __init__(self):
         self.events: list[Annotation] = list()
 
+    @classmethod
+    def loadTsv(cls, filename: str):
+        df = pd.read_csv(filename, delimiter="\t")
+        annotations = cls()
+        for _, row in df.iterrows():
+            annotation = Annotation()
+            annotation['onset'] = float(row['onset'])
+            annotation['duration'] = float(row['duration'])
+            annotation['eventType'] = EventType[row['eventType']]
+            if row['confidence']:
+                annotation['confidence'] = "n/a"
+            else:
+                annotation['confidence'] = float(row['confidence'])
+            print(row['channels'])
+            if row['channels']:
+                annotation['channels'] = "n/a"
+            elif "," in row['channels']:
+                annotation['channels'] = row['channels'].split(",")
+            else:
+                annotation['channels'] = [row['channels']]
+            annotation['dateTime'] = datetime.strptime(row['dateTime'], "%Y-%m-%d %H:%M:%S")
+            annotation['recordingDuration'] = float(row['recordingDuration'])
+            annotations.events.append(annotation)
+    
+        return annotations
+
     def getEvents(self) -> list[(float, float)]:
         events = list()
         for event in self.events:
@@ -57,16 +84,13 @@ class Annotations:
                 ] = 1
         return mask
 
-    def loadTsv(self, filename: str):
-        print("Loading annotations")
-
     def saveTsv(self, filename: str):
         with open(filename, 'w') as f:
             line = '\t'.join(list(Annotation.__annotations__.keys()))
             line += '\n'
             f.write(line)
-            line = ''
             for event in self.events:
+                line = ''
                 line += '{:.2f}\t'.format(event["onset"])
                 line += '{:.2f}\t'.format(event["duration"])
                 line += '{}\t'.format(event["eventType"].value)
