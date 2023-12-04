@@ -1,0 +1,17 @@
+{
+    "EEGReference": "double banana bipolar montage",
+    "SamplingFrequency": $fs,
+    "PowerLineFrequency": 60,
+    "SoftwareFilters": "n/a",
+
+    "EEGChannelCount": $channels,
+    "EEGPlacementScheme": "10-20",
+    "HardwareFilters": "n/a",
+    "RecordingType": "discontinuous",
+    "RecordingDuration": $duration,
+
+    "TaskName": "$task",
+    "TaskDescription": "Subjects were monitored at the hospital for up to several days following withdrawal of anti-seizure medication in order to characterize their seizures and assess their candidacy for surgical intervention.",
+    "InstitutionName": "Boston Children's Hospital"
+  }
+  

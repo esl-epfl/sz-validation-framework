@@ -1,13 +1,15 @@
 import glob
 import os
-from pathlib import Path
 import shutil
+from string import Template
 
 import pandas as pd
 
 import dataIo
 from dataIo.eeg import Eeg
 from dataIo.load_annotations.load_annotations_chb import loadAnnotationsFromEdf
+
+PCKG_LOC = os.path.dirname(dataIo.__file__)
 
 
 def convert(root: str, outDir: str):
@@ -20,6 +22,7 @@ def convert(root: str, outDir: str):
         # Extract subject & session ID
         subject = os.path.split(folder)[-1][3:5]
         session = "01"
+        task = "szMonitoring"
         if subject == "21":
             subject = "01"
             session = "02"
@@ -32,14 +35,19 @@ def convert(root: str, outDir: str):
 
         edfFiles = sorted(glob.glob(os.path.join(root, folder, "*.edf")))
         for fileIndex, edfFile in enumerate(edfFiles):
-            edfFileName = os.path.join(
+            edfBaseName = os.path.join(
                 outPath,
-                "sub-{}_ses-{}_task-szMonitoring_run-{:02}.edf".format(
-                    subject, session, fileIndex
+                "sub-{}_ses-{}_task-{}_run-{:02}_eeg".format(
+                    subject, session, task, fileIndex
                 ),
             )
+            edfFileName = edfBaseName + ".edf"
             # Load EEG and standardize it
-            if os.path.basename(edfFile) not in ('chb12_27.edf', 'chb12_28.edf', 'chb12_29.edf'):
+            if os.path.basename(edfFile) not in (
+                "chb12_27.edf",
+                "chb12_28.edf",
+                "chb12_29.edf",
+            ):
                 eeg = Eeg.loadEdf(edfFile, Eeg.Montage.BIPOLAR, Eeg.BIPOLAR_DBANANA)
                 eeg.standardize(256, Eeg.BIPOLAR_DBANANA, "bipolar")
             else:
@@ -49,10 +57,23 @@ def convert(root: str, outDir: str):
             # Save EEG
             eeg.saveEdf(edfFileName)
 
+            # Save JSON sidecar
+            eegJsonDict = {
+                "fs": "{}".format(int(eeg.fs)),
+                "channels": "{}".format(eeg.data.shape[0]),
+                "duration": "{:.2f}".format(eeg.data.shape[1] / eeg.fs),
+                "task": task,
+            }
+
+            with open(os.path.join(PCKG_LOC, "bids", "eeg_chbmit.json"), "r") as f:
+                src = Template(f.read())
+                eegJsonSidecar = src.substitute(eegJsonDict)
+            with open(edfBaseName + ".json", "w") as f:
+                f.write(eegJsonSidecar)
+
             # Load annotation
-            annotationFileName = os.path.join(os.path.dirname(edfFileName), Path(edfFileName).stem + ".tsv")
             annotations = loadAnnotationsFromEdf(edfFile)
-            annotations.saveTsv(annotationFileName)
+            annotations.saveTsv(edfBaseName + ".tsv")
 
     # Build participant metadata
     subjectInfo = pd.read_csv(
@@ -90,19 +111,17 @@ def convert(root: str, outDir: str):
     participantsDf.to_csv(
         os.path.join(outDir, "participants.tsv"), sep="\t", index=False
     )
-    participantsJsonFileName = os.path.join(
-        os.path.dirname(dataIo.__file__), "bids", "participants.json"
-    )
+    participantsJsonFileName = os.path.join(PCKG_LOC, "bids", "participants.json")
     shutil.copy(participantsJsonFileName, outDir)
 
     # Copy Readme file
-    readmeFileName = os.path.join(
-        os.path.dirname(dataIo.__file__), "bids", "README_chbmit.md"
-    )
+    readmeFileName = os.path.join(PCKG_LOC, "bids", "README_chbmit.md")
     shutil.copyfile(readmeFileName, os.path.join(outDir, "README"))
 
     # Copy dataset description
     descriptionFileName = os.path.join(
-        os.path.dirname(dataIo.__file__), "bids", "dataset_description_chbmit.json"
+        PCKG_LOC, "bids", "dataset_description_chbmit.json"
     )
-    shutil.copyfile(descriptionFileName, os.path.join(outDir, "dataset_description.json"))
+    shutil.copyfile(
+        descriptionFileName, os.path.join(outDir, "dataset_description.json")
+    )
