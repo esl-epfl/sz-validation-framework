@@ -43,33 +43,33 @@ def convert(root: str, outDir: str):
             )
             edfFileName = edfBaseName + ".edf"
             # Load EEG and standardize it
-            if os.path.basename(edfFile) not in (
-                "chb12_27.edf",
-                "chb12_28.edf",
-                "chb12_29.edf",
-            ):
-                eeg = Eeg.loadEdf(edfFile, Eeg.Montage.BIPOLAR, Eeg.BIPOLAR_DBANANA)
-                eeg.standardize(256, Eeg.BIPOLAR_DBANANA, "bipolar")
-            else:
-                eeg = Eeg.loadEdf(edfFile, Eeg.Montage.UNIPOLAR, Eeg.ELECTRODES_10_20)
-                eeg.standardize(256, Eeg.ELECTRODES_10_20, "bipolar")
+            # if os.path.basename(edfFile) not in (
+            #     "chb12_27.edf",
+            #     "chb12_28.edf",
+            #     "chb12_29.edf",
+            # ):
+            #     eeg = Eeg.loadEdf(edfFile, Eeg.Montage.BIPOLAR, Eeg.BIPOLAR_DBANANA)
+            #     eeg.standardize(256, Eeg.BIPOLAR_DBANANA, "bipolar")
+            # else:
+            #     eeg = Eeg.loadEdf(edfFile, Eeg.Montage.UNIPOLAR, Eeg.ELECTRODES_10_20)
+            #     eeg.standardize(256, Eeg.ELECTRODES_10_20, "bipolar")
 
-            # Save EEG
-            eeg.saveEdf(edfFileName)
+            # # Save EEG
+            # eeg.saveEdf(edfFileName)
 
             # Save JSON sidecar
-            eegJsonDict = {
-                "fs": "{}".format(int(eeg.fs)),
-                "channels": "{}".format(eeg.data.shape[0]),
-                "duration": "{:.2f}".format(eeg.data.shape[1] / eeg.fs),
-                "task": task,
-            }
+            # eegJsonDict = {
+            #     "fs": "{}".format(int(eeg.fs)),
+            #     "channels": "{}".format(eeg.data.shape[0]),
+            #     "duration": "{:.2f}".format(eeg.data.shape[1] / eeg.fs),
+            #     "task": task,
+            # }
 
-            with open(os.path.join(PCKG_LOC, "bids", "eeg_chbmit.json"), "r") as f:
-                src = Template(f.read())
-                eegJsonSidecar = src.substitute(eegJsonDict)
-            with open(edfBaseName + ".json", "w") as f:
-                f.write(eegJsonSidecar)
+            # with open(os.path.join(PCKG_LOC, "bids", "eeg_chbmit.json"), "r") as f:
+            #     src = Template(f.read())
+            #     eegJsonSidecar = src.substitute(eegJsonDict)
+            # with open(edfBaseName + ".json", "w") as f:
+            #     f.write(eegJsonSidecar)
 
             # Load annotation
             annotations = loadAnnotationsFromEdf(edfFile)
@@ -98,13 +98,13 @@ def convert(root: str, outDir: str):
             if subject == "sub-01":
                 participants["comment"].append("ses-02 recorded at 13 years old")
             else:
-                participants["comment"].append("")
+                participants["comment"].append("n/a")
 
         else:
             participants["participant_id"].append(subject)
             participants["age"].append("n/a")
             participants["sex"].append("n/a")
-            participants["comment"].append("")
+            participants["comment"].append("n/a")
 
     participantsDf = pd.DataFrame(participants)
     participantsDf.sort_values(by=["participant_id"], inplace=True)
