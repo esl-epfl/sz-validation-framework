@@ -73,7 +73,7 @@ def convert(root: str, outDir: str):
 
             # Load annotation
             annotations = loadAnnotationsFromEdf(edfFile)
-            annotations.saveTsv(edfBaseName + ".tsv")
+            annotations.saveTsv(edfBaseName[:-4] + "_events.tsv")
 
     # Build participant metadata
     subjectInfo = pd.read_csv(
@@ -125,3 +125,7 @@ def convert(root: str, outDir: str):
     shutil.copyfile(
         descriptionFileName, os.path.join(outDir, "dataset_description.json")
     )
+
+    # Copy Events JSON Sidecar
+    eventsFileName = os.path.join(PCKG_LOC, "bids", "events.json")
+    shutil.copy(eventsFileName, outDir)
