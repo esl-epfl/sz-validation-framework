@@ -9,7 +9,7 @@ import dataIo
 from dataIo.eeg import Eeg
 from dataIo.load_annotations.load_annotations_chb import loadAnnotationsFromEdf
 
-PCKG_LOC = os.path.dirname(dataIo.__file__)
+BIDS_DIR = os.path.join(os.path.dirname(dataIo.__file__), "bids")
 
 
 def convert(root: str, outDir: str):
@@ -65,7 +65,7 @@ def convert(root: str, outDir: str):
                 "task": task,
             }
 
-            with open(os.path.join(PCKG_LOC, "bids", "eeg_chbmit.json"), "r") as f:
+            with open(os.path.join(BIDS_DIR, "chbmit", "eeg.json"), "r") as f:
                 src = Template(f.read())
                 eegJsonSidecar = src.substitute(eegJsonDict)
             with open(edfBaseName + ".json", "w") as f:
@@ -111,21 +111,17 @@ def convert(root: str, outDir: str):
     participantsDf.to_csv(
         os.path.join(outDir, "participants.tsv"), sep="\t", index=False
     )
-    participantsJsonFileName = os.path.join(PCKG_LOC, "bids", "participants.json")
+    participantsJsonFileName = os.path.join(BIDS_DIR, "chbmit", "participants.json")
     shutil.copy(participantsJsonFileName, outDir)
 
     # Copy Readme file
-    readmeFileName = os.path.join(PCKG_LOC, "bids", "README_chbmit.md")
+    readmeFileName = os.path.join(BIDS_DIR, "chbmit", "README.md")
     shutil.copyfile(readmeFileName, os.path.join(outDir, "README"))
 
     # Copy dataset description
-    descriptionFileName = os.path.join(
-        PCKG_LOC, "bids", "dataset_description_chbmit.json"
-    )
-    shutil.copyfile(
-        descriptionFileName, os.path.join(outDir, "dataset_description.json")
-    )
+    descriptionFileName = os.path.join(BIDS_DIR, "chbmit", "dataset_description.json")
+    shutil.copy(descriptionFileName, outDir)
 
     # Copy Events JSON Sidecar
-    eventsFileName = os.path.join(PCKG_LOC, "bids", "events.json")
+    eventsFileName = os.path.join(BIDS_DIR, "events.json")
     shutil.copy(eventsFileName, outDir)

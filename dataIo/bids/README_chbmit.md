@@ -19,7 +19,7 @@ The original Physionet CHB-MIT Scalp EEG Database was published by Ali Shoeb. Th
 
 ### Practical information to access the data
 
-The orginal Physionet CHB-MIT Scalp EEG Database is available on the [Physionet website](https://physionet.org/content/chbmit/1.0.0/).
+The original Physionet CHB-MIT Scalp EEG Database is available on the [Physionet website](https://physionet.org/content/chbmit/1.0.0/).
 
 ## Overview
 
@@ -39,7 +39,7 @@ This database, collected at the Children’s Hospital Boston, consists of EEG re
 
 Each folder (sub-01, sub-01, etc.) contains between 9 and 42 continuous .edf files from a single subject. Hardware limitations resulted in gaps between consecutively-numbered .edf files, during which the signals were not recorded; in most cases, the gaps are 10 seconds or less, but occasionally there are much longer gaps. In order to protect the privacy of the subjects, all protected health information (PHI) in the original .edf files has been replaced with surrogate information in the files provided here. Dates in the original .edf files have been replaced by surrogate dates, but the time relationships between the individual files belonging to each case have been preserved. In most cases, the .edf files contain exactly one hour of digitized EEG signals, although those belonging to case sub-10 are two hours long, and those belonging to cases sub-04, sub-06, sub-07, sub-09, and sub-23 are four hours long; occasionally, files in which seizures are recorded are shorter.
 
-The EEG is recorded at 256 Hz with a 16 bit resolution. The recodings are referenced in a double banana bipolar montage with 18 channels from the 10-20 electrode system.
+The EEG is recorded at 256 Hz with a 16 bit resolution. The recordings are referenced in a double banana bipolar montage with 18 channels from the 10-20 electrode system.
 
 The dataset also contains seizure annotations as start and stop times.
 
