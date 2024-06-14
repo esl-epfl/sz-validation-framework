@@ -1,0 +1,29 @@
+[project]
+name = "evaluate"
+version = "0.1.0"
+description = "Evaluation code to compare annotations from a seizure detection algorithm to ground truth annotations."
+authors = [
+    { name = "Jonathan Dan", email = "jonathan.dan@epfl.ch" }
+]
+dependencies = [
+    "timescoring>=0.0.5",
+    "epilepsy2bids>=0.0.1",
+    "numpy>=1.26.4",
+    "pandas>=2.2.2",
+]
+readme = "README.md"
+requires-python = ">= 3.10"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.rye]
+managed = true
+dev-dependencies = []
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/evaluate"]

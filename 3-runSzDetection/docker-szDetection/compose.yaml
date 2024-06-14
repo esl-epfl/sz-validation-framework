@@ -1,0 +1,7 @@
+services:
+  sz_detection:
+    build:
+      context: .
+    volumes:
+      - ~/Desktop/testTuh/:/data:ro
+      - ~/Desktop/output/:/output:rw
