@@ -1,6 +1,6 @@
-# Seizure validation Framework
+# SzCORE - Seizure validation Framework
 
-This repository illustrates the flow to evaluate a seizure detection algorithm. The different steps and accompanying example code and libraries are documented in the different steps:
+This repository illustrates the flow to evaluate a seizure detection algorithm using the SzCORE methodology presented in [*Dan et al. "SzCORE: A Seizure Community Open-source Research Evaluation framework for the validation of EEG-based automated seizure detection algorithms"*](https://arxiv.org/abs/2402.13005). The procedure and accompanying example code and libraries are documented in four steps:
 
 1. [Download datasets](1-download.md)
 2. [Convert datasets to BIDS](2-convert2bids.md)

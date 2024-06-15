@@ -1,7 +1,7 @@
 # Evaluate
 
-Evaluate the annotations produces by the seizure detection algorithm invoked in step 3.
-A package named [`evaluate`](4-evaluate) is provided to do the evaluation.
+Evaluate the annotations produced by the seizure detection algorithm invoked in step 3.
+A package named [`evaluate`](4-evaluate) is provided to do the evaluation. It relies on the [`timescoring`](https://github.com/esl-epfl/timescoring) library.
 
 The package provides a simple interface and prints results to the command line:
 
@@ -9,7 +9,7 @@ The package provides a simple interface and prints results to the command line:
 python -m evaluate rootRefDataset rootHypDataset
 ```
 
-The output is formatted as
+The output provides both sample based and event based scoring. As explained in the [SzCORE paper](https://arxiv.org/abs/2402.13005).
 
 ```txt
 # Sample scoring

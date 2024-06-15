@@ -10,7 +10,7 @@ python -m algo input.edf output.tsv
 
 The python package is containerized in a docker container that is responsible for installing all package dependencies. The [`Dockerfile`](3-runSzDetection/docker-szDetection/Dockerfile) provides a template that can be used to package python packages.
 
-The docker container can than be invoked to analyze an EEG file:
+The docker container can then be invoked to analyze an EEG file:
 
 ```bash
 docker compose run -e INPUT="input.edf" -e OUTPUT="output.tsv" sz_detection

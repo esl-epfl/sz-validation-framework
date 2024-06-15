@@ -2,7 +2,7 @@
 
 All datasets store the EEG data and the seizure annotations differently. They use a different folder structure, different sampling frequencies, channels and reference for the EEG, and different formats for the annotations. This complicates development of algorithms that are intended to run on any dataset. The [Brain Imaging Data Structure](https://bids.neuroimaging.io/) (BIDS) provides a strandardized organization of neuroimaging studies.
 
-The [`epilepsy2bids`](https://github.com/esl-epfl/epilepsy2bids) package converts the main epilepsy datasets to BIDS compliant datasets. The conversion is opiniated to make all datasets as similar as possible.
+The [`epilepsy2bids`](https://github.com/esl-epfl/epilepsy2bids) package converts the main epilepsy datasets to BIDS compliant datasets. The conversion is opinionated to make all datasets as similar as possible.
 
 Converted EDF files contain :
 
