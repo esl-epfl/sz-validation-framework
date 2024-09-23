@@ -9,7 +9,7 @@ The package provides a simple interface and prints results to the command line:
 python -m evaluate rootRefDataset rootHypDataset
 ```
 
-The output provides both sample based and event based scoring. As explained in the [SzCORE paper](https://arxiv.org/abs/2402.13005).
+The output provides both sample based and event based scoring. As explained in the [SzCORE paper](https://doi.org/10.1111/epi.18113).
 
 ```txt
 # Sample scoring
